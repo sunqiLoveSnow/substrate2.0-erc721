@@ -457,7 +457,7 @@ pub struct AskOrderItem<T> where T:Trait{
     asset: T::AssetId,
     price: T::Balance,
     timepoint: T::Moment,
-    fill_or_kill: bool,
+    immediate_or_cancel: bool,
     bind_tokens: Vec<T::Hash>,
     status: OrderStatus,
 }
@@ -469,7 +469,7 @@ impl<T:Trait> core::fmt::Display for AskOrderItem<T>{
         self.asset, 
         self.price, 
         self.timepoint, 
-        self.fill_or_kill, 
+        self.immediate_or_cancel, 
         self.bind_tokens.len(), 
         self.status  )
     }
@@ -483,7 +483,7 @@ pub struct BidOrderItem<T> where T:Trait{
     asset: T::AssetId,
     price: T::Balance,
     timepoint: T::Moment,
-    fill_or_kill: bool,
+    immediate_or_cancel: bool,
     tk_count_to_buy: BalanceOf<T>,
     status: OrderStatus,
 }
@@ -496,7 +496,7 @@ impl<T:Trait> core::fmt::Display for BidOrderItem<T>{
         self.asset, 
         self.price, 
         self.timepoint, 
-        self.fill_or_kill, 
+        self.immediate_or_cancel, 
         self.tk_count_to_buy, 
         self.status  )
     }
@@ -525,13 +525,13 @@ decl_event!(
     {
         // TokenOrderCreate(AccountId, Hash), 
 
-        // creator, order_id, asset, price, timepoint, fill_or_kill
+        // creator, order_id, asset, price, timepoint, immediate_or_cancel
         OrderOpened(AccountId, Hash, AssetId, Balance, Moment, bool),
         // seller, buyer, token_id,trade_asset, trade_price, timepoint, 
         OrderFilled(AccountId, AccountId, Hash, AssetId, Balance, Moment),
         // creator, order_id, timepoint, 
         OrderCanceled(AccountId, Hash, Moment),
-        // creator, order_id, asset, price, timepoint, fill_or_kill
+        // creator, order_id, asset, price, timepoint, immediate_or_cancel
         OrderClosed(AccountId, Hash, AssetId, Balance, Moment, bool),
     }
 );
@@ -573,17 +573,17 @@ decl_module! {
             selector: TokenSelector<T::Hash>,
             asset: T::AssetId,
             price: T::Balance,
-            fill_or_kill: bool) -> Result{
+            immediate_or_cancel: bool) -> Result{
             let creator = ensure_signed(origin)?;
-            Self::_token_buy_order_create(creator, selector, asset, price, fill_or_kill)
+            Self::_token_buy_order_create(creator, selector, asset, price, immediate_or_cancel)
         }
         fn token_sell_order_create(origin,
             selector: TokenSelector<T::Hash>,
             asset: T::AssetId,
             price: T::Balance,
-            fill_or_kill: bool) -> Result{
+            immediate_or_cancel: bool) -> Result{
             let creator = ensure_signed(origin)?;
-            Self::_token_sell_order_create(creator, selector, asset, price, fill_or_kill)
+            Self::_token_sell_order_create(creator, selector, asset, price, immediate_or_cancel)
         }
         
         fn token_buy_order_cancel(origin, order_id:T::Hash) -> Result{
@@ -703,7 +703,7 @@ impl<T: Trait> Module<T> {
                 None => return Err("order not found"),
             };
             // order.status = OrderStatus::Closed;
-            Self::deposit_event(RawEvent::OrderClosed(order.creator, order_id, order.asset, order.price, order.timepoint, order.fill_or_kill));
+            Self::deposit_event(RawEvent::OrderClosed(order.creator, order_id, order.asset, order.price, order.timepoint, order.immediate_or_cancel));
             // remove order from BidTokenOrders
             <BidTokenOrders<T>>::remove(&order_id);
 
@@ -727,7 +727,7 @@ impl<T: Trait> Module<T> {
                 None => return Err("order not found"),
             };
             // order.status = OrderStatus::Closed;
-            Self::deposit_event(RawEvent::OrderClosed(order.creator, order_id, order.asset, order.price, order.timepoint, order.fill_or_kill));
+            Self::deposit_event(RawEvent::OrderClosed(order.creator, order_id, order.asset, order.price, order.timepoint, order.immediate_or_cancel));
             // remove order from AskTokenOrders
             <AskTokenOrders<T>>::remove(&order_id);
 
@@ -1073,17 +1073,17 @@ impl<T: Trait> Module<T> {
         selector: TokenSelector<T::Hash>,
         asset: T::AssetId,
         price: T::Balance,
-        fill_or_kill: bool) -> Result {
+        immediate_or_cancel: bool) -> Result {
 
         let timepoint = <timestamp::Module<T>>::get() ;
-        let order_id = (&creator, &asset, timepoint,  price, fill_or_kill, true, &selector).using_encoded(<T as system::Trait>::Hashing::hash);
+        let order_id = (&creator, &asset, timepoint,  price, immediate_or_cancel, true, &selector).using_encoded(<T as system::Trait>::Hashing::hash);
 
         // trigger match, send fill op if filled
         let bind_tokens = Self::_token_match_visitor(creator.clone(), &selector);
         ensure!(bind_tokens.len() > 0, "no token selected, so invalid, please check your token_id and Attributes and reset");
         // let token_upper_limit_size: usize = selector.token_count().into();
         ensure!(bind_tokens.len() <= selector.token_count().try_into().unwrap(), "upper limit amount of bind tokens is exceeded");
-        Self::deposit_event(RawEvent::OrderOpened(creator.clone(), order_id, asset, price, timepoint, fill_or_kill));
+        Self::deposit_event(RawEvent::OrderOpened(creator.clone(), order_id, asset, price, timepoint, immediate_or_cancel));
 
         // reserve tokens
         for token_id in bind_tokens.iter(){
@@ -1092,13 +1092,13 @@ impl<T: Trait> Module<T> {
         
         // remove from bind_tokens if fill
         let bind_tokens = Self::_token_match_ask(creator.clone(), price, asset, bind_tokens);
-        // add left to token ask orderbook if not fill_or_kill
-        if bind_tokens.len() ==0 || fill_or_kill {
+        // add left to token ask orderbook if not immediate_or_cancel
+        if bind_tokens.len() ==0 || immediate_or_cancel {
             // unreserve left tokens
             for token_id in bind_tokens.iter(){
                 <nfts::Module<T>>::_token_unreserve(creator.clone(), *token_id)?;
             };
-            Self::deposit_event(RawEvent::OrderClosed(creator.clone(), order_id, asset, price, timepoint, fill_or_kill));
+            Self::deposit_event(RawEvent::OrderClosed(creator.clone(), order_id, asset, price, timepoint, immediate_or_cancel));
 
             return Ok(())
         };
@@ -1110,7 +1110,7 @@ impl<T: Trait> Module<T> {
             asset,
             price,
             timepoint,
-            fill_or_kill,
+            immediate_or_cancel,
             bind_tokens:bind_tokens.clone(),
             status: OrderStatus::Open,
         };
@@ -1128,12 +1128,12 @@ impl<T: Trait> Module<T> {
         selector: TokenSelector<T::Hash>,
         asset: T::AssetId,
         price: T::Balance,
-        fill_or_kill: bool) -> Result {
+        immediate_or_cancel: bool) -> Result {
 
         let timepoint = <timestamp::Module<T>>::get() ;
-        let order_id = (&creator, &asset, timepoint, price, fill_or_kill, false, &selector).using_encoded(<T as system::Trait>::Hashing::hash);
+        let order_id = (&creator, &asset, timepoint, price, immediate_or_cancel, false, &selector).using_encoded(<T as system::Trait>::Hashing::hash);
         // send order create event
-        Self::deposit_event(RawEvent::OrderOpened(creator.clone(), order_id, asset, price, timepoint, fill_or_kill));
+        Self::deposit_event(RawEvent::OrderOpened(creator.clone(), order_id, asset, price, timepoint, immediate_or_cancel));
 
         let tk_count_to_buy = selector.token_count();
         // reserve asset
@@ -1143,8 +1143,8 @@ impl<T: Trait> Module<T> {
         
         // trigger match, send fill op if filled
         let tk_count_to_buy = Self::_token_match_bid(creator.clone(), price, asset, tk_count_to_buy, &selector);
-        // add left to token bid orderbook if not fill_or_kill
-        if tk_count_to_buy == 0 || fill_or_kill {
+        // add left to token bid orderbook if not immediate_or_cancel
+        if tk_count_to_buy == 0 || immediate_or_cancel {
             let tk_count_to_buy_balance : T::Balance = tk_count_to_buy.into();
             let unreserved_balance = tk_count_to_buy_balance * price;
             return Self::_unreserve_asset(creator.clone(), asset, unreserved_balance );
@@ -1158,7 +1158,7 @@ impl<T: Trait> Module<T> {
             asset,
             price,
             timepoint,
-            fill_or_kill,
+            immediate_or_cancel,
             tk_count_to_buy: tk_count_to_buy.into() ,
             status: OrderStatus::Open,
         };
