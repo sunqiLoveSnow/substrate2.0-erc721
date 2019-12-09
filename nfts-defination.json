@@ -1,0 +1,128 @@
+{
+  "Price": "u64",
+  "Balance": "u64",
+  "AccountId": "u64",
+  "Hash": "H256",
+  // json for nfts.rs
+  "PermissionType": {
+    "_enum": ["Black", "White"]
+  },
+  "Permission": {
+    "perm_type":"PermissionType",
+    "account":"AccountId"
+  },
+  "NonfungibleOption":{
+    "permissions":"Vec<Permission>",
+    "max_supply":"Balance",
+    "description":"Vec<u8>"
+
+  },
+  "NftMeta":{
+    "total_supply": "Balance", // amount of tokens issued
+    "issuer": "AccountId",
+    "symbol":"Vec<u8>",// symbol name of this nft 
+    "nft_id": "Hash",
+    "option": "NonfungibleOption",
+  },
+  "Token":{
+    "token_id": "Hash",
+    "symbol": "Vec<u8>", // symbol of this token
+    "nft_id": "Hash", // nft_id
+  },
+  // json for order.rs
+  "OrderStatus":{
+    "_enum": [ 
+      "Open",
+      "PartialFilled",
+      "Filled",
+      "Closed",
+      "Canceled"
+    ]
+  },
+  "TokenAttrValType":{
+    "_enum": {
+      "String":"Vec<u8>",
+      "Uint64":"u64"
+    }
+  },
+  "CompareOpcode" : {"_enum":[
+      "TokenCmpEq",
+      "TokenCmpGt",
+      "TokenCmpLt",
+      "TokenCmpGe",
+      "TokenCmpLe",
+      "TokenCmpNe",
+      "TokenCmpMax",
+    ]},
+  "LogicOpcode":{"_enum":[
+      "TokenLogicAnd" ,
+      "TokenLogicOr",
+      "TokenLogicXor",
+      "TokenLogicMax",
+      "TokenCmpTrue",
+      "TokenCmpFalse",
+    ]},
+  "BooleanExpression":{
+    "op": "CompareOpcode",
+    "key": "Vec<u8>",
+    "val" : "TokenAttrValType",
+  },
+  "FilterItem": { "_enum":{
+        "Uint8T":"LogicOpcode", 
+        "BoolExp":"BooleanExpression"}
+  },
+  "FilterStack" : "Vec<FilterItem>" ,
+  "TokenParser" :{
+    "s":"VecDeque<LogicOpcode>",
+  },
+  "TokenAttrSelector":{
+    "max_count": "u32",
+    "stack":"FilterStack",
+  },
+  "TokenIdSelector":{
+    "id_set": "Vec<Hash>",// token_id_type : H::Hash
+  },
+  "SelectorType":{ "_enum":{
+      "IdSelect":"TokenIdSelector<Hash>",
+      "AttrSelect":"TokenAttrSelector",}
+  },
+  "TokenSelector":{
+    "selector": "SelectorType",
+    "nft_type": "Hash",
+  },
+  "AskOrderItem":{
+    "creator": "AccountId",
+    "order_id": "Hash",
+    "selector": "TokenSelector",
+    "asset": "AssetId",
+    "price": "Balance",
+    "timepoint": "Moment",
+    "fill_or_kill": "bool",
+    "bind_tokens": "Vec<Hash>",
+    "status": "OrderStatus",
+  },
+  "BidOrderItem":{
+    "creator": "AccountId",
+    "order_id": "Hash",
+    "selector": "TokenSelector",
+    "asset": "AssetId",
+    "price": "Balance",
+    "timepoint": "Moment",
+    "fill_or_kill": "bool",
+    "tk_count_to_buy": "Balance",
+    "status": "OrderStatus",
+  },
+  "TokenPrice":{
+    "asset": "AssetId",
+    "amount": "Balance",
+  },
+  "Attributes":{
+    "key": "Vec<u8>",
+    "value": "TokenAttrValType",
+  },
+
+}
+
+
+
+
